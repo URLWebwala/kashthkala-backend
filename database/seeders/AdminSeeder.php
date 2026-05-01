@@ -16,12 +16,12 @@ class AdminSeeder extends Seeder
     public function run(): void
     {
         DB::table('users')->updateOrInsert(
-            ['email' => 'info@urlwebwala.com'],
+            ['email' => 'kashthkala@gmail.com'],
             [
                 'name' => 'Admin',
                 'user_type' => UserTypeEnum::ADMIN,
                 'phone' => '1234567890',
-                'password' => Hash::make('admin'),
+                'password' => Hash::make('Kashth@1994'),
                 'created_by' => 1,
                 'created_at' => now(),
                 'ip_address' => Request::ip(),
