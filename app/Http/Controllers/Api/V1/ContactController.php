@@ -63,6 +63,7 @@ class ContactController extends BaseController
                 $title = trans('message.success');
                 $message = trans('message.created', ['attribute' => __('message.contact_us')]);
                 $contact = $this->repository->store($inputs);
+                sendWhatsAppMessage($contact);
             } else {
                 $title = trans('message.success');
                 $message = trans('first_name.updated', ['attribute' => __('message.contact_us')]);

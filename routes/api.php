@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Settings\BrandingController;
 use App\Http\Controllers\Api\V1\Settings\EmailTemplateController;
 use App\Http\Controllers\Api\V1\Settings\SmtpController;
 use App\Http\Controllers\Api\V1\Settings\SocialMediaController;
+use App\Http\Controllers\Api\V1\Settings\WhatsappSettingController;
 use App\Http\Controllers\Api\V1\SubCategoryController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\TestinomialController;
@@ -55,6 +56,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/contact', [ContactController::class, 'store']);
         Route::post('/enquiry', [ContactController::class, 'store']);
         Route::post('/subscribe', [SubscriberController::class, 'store']);
+        Route::get('/whatsapp-widget', [WhatsappSettingController::class, 'getWidgetConfig']);
     });
 
     Route::prefix('auth')->group(function () {
@@ -180,6 +182,10 @@ Route::prefix('v1')->group(function () {
             Route::get('/social-media', [SocialMediaController::class, 'list']);
             Route::post('/social-media', [SocialMediaController::class, 'store']);
             Route::get('/social-media/{id}', [SocialMediaController::class, 'show']);
+
+            Route::get('/whatsapp', [WhatsappSettingController::class, 'list']);
+            Route::post('/whatsapp', [WhatsappSettingController::class, 'store']);
+            Route::get('/whatsapp/{id}', [WhatsappSettingController::class, 'show']);
         });
     });
 });

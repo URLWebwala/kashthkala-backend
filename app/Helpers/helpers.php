@@ -214,3 +214,50 @@ if (!function_exists('sendMailSMTP')) {
         }
     }
 }
+
+if (!function_exists('sendWhatsAppMessage')) {
+    function sendWhatsAppMessage($contact)
+    {
+        try {
+            $setting = \App\Models\Settings\WhatsappSetting::first();
+            
+            if (!$setting || !$setting->status || empty($setting->api_endpoint_url) || empty($setting->api_access_token) || empty($setting->instance_id) || empty($setting->whatsapp_number)) {
+                return ['status' => false, 'error' => 'WhatsApp not configured or disabled'];
+            }
+
+            $firstName = $contact->first_name ?? 'N/A';
+            $lastName = $contact->last_name ?? '';
+            $email = $contact->email ?? 'N/A';
+            $phone = $contact->phone ?? 'N/A';
+            $messageText = $contact->message ?? 'N/A';
+            $type = $contact->type ?? 'Contact';
+
+            $message = "*New $type Enquiry*\n";
+            $message .= "Name: $firstName $lastName\n";
+            $message .= "Email: $email\n";
+            $message .= "Phone: $phone\n";
+            $message .= "Message: $messageText\n";
+
+            $endpoint = rtrim($setting->api_endpoint_url, '/');
+            
+            $url = $endpoint . '/send'; 
+            
+            $response = \Illuminate\Support\Facades\Http::post($url, [
+                'number' => $setting->whatsapp_number,
+                'type' => 'text',
+                'message' => $message,
+                'instance_id' => $setting->instance_id,
+                'access_token' => $setting->api_access_token
+            ]);
+
+            if ($response->successful()) {
+                return ['status' => true, 'response' => $response->json()];
+            }
+
+            return ['status' => false, 'error' => $response->body()];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('WhatsApp ERROR: ' . $e->getMessage());
+            return ['status' => false, 'error' => $e->getMessage()];
+        }
+    }
+}
