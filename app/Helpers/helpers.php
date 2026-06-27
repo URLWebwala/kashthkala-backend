@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 if (!function_exists('defaultColumns')) {
 
-    function defaultColumns(Blueprint $table, Closure $callback = null)
+    function defaultColumns(Blueprint $table, ?Closure $callback = null)
     {
         $table->bigIncrements('id');
 
@@ -72,10 +72,10 @@ if (!function_exists('apiSuccess')) {
     function apiSuccess(string $message = 'Success', $data = [], int $code = 200, string $title = 'Success'): JsonResponse
     {
         return response()->json([
-            'status'  => true,
-            'title'   => $title,
+            'status' => true,
+            'title' => $title,
             'message' => $message,
-            'data'    => $data,
+            'data' => $data,
         ], $code);
     }
 }
@@ -84,10 +84,10 @@ if (!function_exists('apiError')) {
     function apiError(string $message = 'Something went wrong', int $code = 400, string $title = 'Error', array $errors = []): JsonResponse
     {
         return response()->json([
-            'status'  => false,
-            'title'   => $title,
+            'status' => false,
+            'title' => $title,
             'message' => $message,
-            'errors'  => $errors
+            'errors' => $errors
         ], $code);
     }
 }
@@ -96,10 +96,10 @@ if (!function_exists('validationError')) {
     function validationError($errors = [], int $code = 422, string $title = 'Validation Error'): JsonResponse
     {
         return response()->json([
-            'status'  => false,
-            'title'   => $title,
+            'status' => false,
+            'title' => $title,
             'message' => __('message.validation_error'),
-            'errors'  => $errors
+            'errors' => $errors
         ], $code);
     }
 }
@@ -179,17 +179,20 @@ if (!function_exists('sendMailSMTP')) {
                     ->subject($data['subject'] ?? 'Notification');
 
                 $fromAddress = $data['from'] ?? ($smtp->from_address ?? config('mail.from.address'));
-                $fromName    = $data['from_name'] ?? ($smtp->from_name ?? config('mail.from.name'));
+                $fromName = $data['from_name'] ?? ($smtp->from_name ?? config('mail.from.name'));
                 $message->from($fromAddress, $fromName);
 
                 $cc = $data['cc'] ?? ($smtp->cc_address ?? null);
-                if ($cc) $message->cc(explode(',', $cc));
+                if ($cc)
+                    $message->cc(explode(',', $cc));
 
                 $bcc = $data['bcc'] ?? ($smtp->bcc_address ?? null);
-                if ($bcc) $message->bcc(explode(',', $bcc));
+                if ($bcc)
+                    $message->bcc(explode(',', $bcc));
 
                 $replyTo = $data['reply_to'] ?? ($smtp->reply_to_address ?? null);
-                if ($replyTo) $message->replyTo($replyTo);
+                if ($replyTo)
+                    $message->replyTo($replyTo);
 
                 if (!empty($data['html'])) {
                     $message->html($data['html']);
@@ -219,9 +222,18 @@ if (!function_exists('sendWhatsAppMessage')) {
     function sendWhatsAppMessage($contact)
     {
         try {
-            $setting = \App\Models\Settings\WhatsappSetting::first();
-            
-            if (!$setting || !$setting->status || empty($setting->api_endpoint_url) || empty($setting->api_access_token) || empty($setting->instance_id) || empty($setting->whatsapp_number)) {
+            $setting = \App\Models\Settings\WhatsappSetting::latest()->first();
+
+            if (!$setting) {
+                \Illuminate\Support\Facades\Log::warning('WhatsApp ERROR: Settings not found in DB (WhatsappSetting is null)');
+                return ['status' => false, 'error' => 'WhatsApp not configured or disabled'];
+            }
+            if (!$setting->status) {
+                \Illuminate\Support\Facades\Log::warning('WhatsApp ERROR: Settings status is inactive');
+                return ['status' => false, 'error' => 'WhatsApp not configured or disabled'];
+            }
+            if (empty($setting->api_endpoint_url) || empty($setting->api_access_token) || empty($setting->instance_id) || empty($setting->whatsapp_number)) {
+                \Illuminate\Support\Facades\Log::warning('WhatsApp ERROR: Missing configuration values (URL, Token, Instance ID, or Number)');
                 return ['status' => false, 'error' => 'WhatsApp not configured or disabled'];
             }
 
@@ -239,24 +251,33 @@ if (!function_exists('sendWhatsAppMessage')) {
             $message .= "Message: $messageText\n";
 
             $endpoint = rtrim($setting->api_endpoint_url, '/');
-            
-            $url = $endpoint . '/send'; 
-            
-            $response = \Illuminate\Support\Facades\Http::post($url, [
-                'number' => $setting->whatsapp_number,
-                'type' => 'text',
-                'message' => $message,
-                'instance_id' => $setting->instance_id,
-                'access_token' => $setting->api_access_token
-            ]);
+
+            // Meta Cloud API format: https://graph.facebook.com/v23.0/{Phone-Number-ID}/messages
+            // Hum yahan man kar chal rahe hain ki admin panel me 'Instance ID' wale field me 'Phone Number ID' dala gaya hai.
+            $url = $endpoint . '/' . $setting->instance_id . '/messages';
+
+            \Illuminate\Support\Facades\Log::info("WhatsApp INFO: Sending Meta message to $url for number {$setting->whatsapp_number}");
+
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()
+                ->withToken($setting->api_access_token) // Ye automatically 'Authorization: Bearer <token>' add kar dega
+                ->post($url, [
+                    'messaging_product' => 'whatsapp',
+                    'to' => $setting->whatsapp_number,
+                    'type' => 'text',
+                    'text' => [
+                        'body' => $message
+                    ]
+                ]);
 
             if ($response->successful()) {
+                \Illuminate\Support\Facades\Log::info('WhatsApp SUCCESS: Message sent', ['response' => $response->json()]);
                 return ['status' => true, 'response' => $response->json()];
             }
 
+            \Illuminate\Support\Facades\Log::error('WhatsApp ERROR: API Response Failed', ['body' => $response->body()]);
             return ['status' => false, 'error' => $response->body()];
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('WhatsApp ERROR: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('WhatsApp EXCEPTION: ' . $e->getMessage());
             return ['status' => false, 'error' => $e->getMessage()];
         }
     }
